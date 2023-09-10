@@ -146,9 +146,9 @@ def channel_names():
     return ch_name
 
 # CONNECTING WITH MYSQL DATABASE
-mysql_connection = sql.connect(host="localhost",
-                user="jai",
-                password="jai123",
+mysql_connection = sql.connect(host="DESKTOP-MNO4NS6",
+                user="gvjai",
+                password="gvjai123",
                 database= "youtube_db",
                 auth_plugin='mysql_native_password',
                 charset='utf8mb4'
