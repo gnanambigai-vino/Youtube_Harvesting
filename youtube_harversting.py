@@ -6,7 +6,7 @@ import pandas as pd
 import mysql.connector as sql
 
 # SETTING PAGE CONFIGURATIONS
-icon = Image.open(r"C:\Users\GVJai\Desktop\Project\YouTube\YouTube_Logo.png")
+icon = Image.open(r"YouTube_Logo.png")
 st.set_page_config(page_title= "Youtube Data Harvesting and Warehousing",
                    page_icon= icon,
                    layout= "wide",
