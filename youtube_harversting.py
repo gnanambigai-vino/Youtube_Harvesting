@@ -174,14 +174,20 @@ def MongoDBtoMySQL(ch_name):
         count = mysql_cursor.fetchone()[0]
 
         if count == 0:
-            data_to_insert = (document["Channel_details"][0]["Channel_id"], document["Channel_details"][0]["Channel_name"],document["Channel_details"][0]["Playlist_id"],document["Channel_details"][0]["Subscribers"],document["Channel_details"][0]["Views"],document["Channel_details"][0]["Total_videos"],document["Channel_details"][0]["Description"],document["Channel_details"][0]["Country"])  # Replace with actual field names
+            data_to_insert = (document["Channel_details"][0]["Channel_id"], document["Channel_details"][0]["Channel_name"],
+                              document["Channel_details"][0]["Playlist_id"],document["Channel_details"][0]["Subscribers"],
+                              document["Channel_details"][0]["Views"],document["Channel_details"][0]["Total_videos"],
+                              document["Channel_details"][0]["Description"],document["Channel_details"][0]["Country"]) 
             mysql_cursor.execute(mysql_Channel_insert_query, data_to_insert)
             for video in document["Channel_details"][0]["video_details"]:
-                data_to_insert_video=(video["Video_id"],video["Title"],video["Thumbnail"],video["Description"],video["Published_date"],video["Duration"],video["Views"],video["Likes"],video["Comments"],video["Favorite_count"],video["Definition"],document["Channel_details"][0]["Channel_id"])
+                data_to_insert_video=(video["Video_id"],video["Title"],video["Thumbnail"],video["Description"],video["Published_date"],
+                                      video["Duration"],video["Views"],video["Likes"],video["Comments"],video["Favorite_count"],
+                                      video["Definition"],document["Channel_details"][0]["Channel_id"])
                 mysql_cursor.execute(mysql_Video_insert_query, data_to_insert_video)
                 if(len(video["Comment_details"])>0):
                     for comment in video["Comment_details"]:
-                        data_to_insert_comment=(comment["Comment_id"],comment["Comment_text"],comment["Comment_author"],comment["Comment_posted_date"],comment["Like_count"],comment["Reply_count"],video["Video_id"])
+                        data_to_insert_comment=(comment["Comment_id"],comment["Comment_text"],comment["Comment_author"],
+                                                comment["Comment_posted_date"],comment["Like_count"],comment["Reply_count"],video["Video_id"])
                         mysql_cursor.execute(mysql_Comment_insert_query, data_to_insert_comment)
             
     # Commit the changes to MySQL and close the connection
