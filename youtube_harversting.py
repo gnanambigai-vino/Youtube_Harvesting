@@ -3,7 +3,7 @@ from streamlit_option_menu import option_menu
 from PIL import Image
 import pymongo
 import pandas as pd
-import mysql.connector as sql
+import sqlite3
 
 # SETTING PAGE CONFIGURATIONS
 icon = Image.open(r"YouTube_Logo.png")
@@ -145,61 +145,96 @@ def channel_names():
         ch_name.append(i["Channel_details"][0]["Channel_name"])
     return ch_name
 
-# CONNECTING WITH MYSQL DATABASE
-mysql_connection = sql.connect(host="DESKTOP-MNO4NS6",
-                user="gvjai",
-                password="gvjai123",
-                database= "youtube_db",
-                auth_plugin='mysql_native_password',
-                charset='utf8mb4'
-                )
-mysql_cursor = mysql_connection.cursor()
 
-def MongoDBtoMySQL(ch_name):
+sqlite_con = sqlite3.connect("youtube_data.db")
+
+sqlite_cursor = sqlite_con.cursor()
+
+sqlite_cursor.execute('''CREATE TABLE IF NOT EXISTS Channel_details(
+    Channel_id TEXT PRIMARY KEY,
+    Channel_name TEXT,
+    Playlist_id TEXT,
+    Subscribers INTEGER,
+    Views INTEGER,
+    Total_videos INTEGER,
+    Description TEXT,
+    Country TEXT
+    )''')
+
+sqlite_cursor.execute('''CREATE TABLE IF NOT EXISTS Video_details(
+    Video_id TEXT PRIMARY KEY,
+    Title TEXT,
+    Thumbnail TEXT,
+    Description TEXT,
+    Published_date TEXT,
+    Duration TEXT,
+    Views INTEGER,
+    Likes INTEGER,
+    Comments INTEGER,
+    Favorite_count INTEGER,
+    Definition TEXT,
+    Channel_id TEXT,
+    FOREIGN KEY (Channel_id) REFERENCES Channel_details(Channel_id)             
+    )''')
+
+sqlite_cursor.execute('''CREATE TABLE IF NOT EXISTS Comment_details(
+    Comment_id TEXT PRIMARY KEY,
+    Comment_text TEXT,
+    Comment_author TEXT,
+    Comment_posted_date TEXT,
+    Like_count INTEGER,
+    Reply_count INTEGER,
+    Video_id TEXT,
+    FOREIGN KEY (Video_id) REFERENCES Video_details(Video_id)            
+    )''')
+
+
+def MongoDBtoSQLite(ch_name):
    
     # Collection Name
     collections = db.channel_detail
     mongodb_data = collections.find({"Channel_details.Channel_name" : ch_name})
     
  
-    # Define a MySQL INSERT statement
-    mysql_Channel_insert_query = "INSERT INTO channel_details (Channel_id, Channel_name,Playlist_id,Subscribers,Views,Total_videos,Description,Country) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-    mysql_Video_insert_query = "INSERT INTO video_details (Video_id, Title,Thumbnail,Description,Published_date,Duration,Views,Likes,Comments,Favorite_count,Definition,Channel_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-    mysql_Comment_insert_query = "INSERT INTO comment_details (Comment_id, Comment_text,Comment_author,Comment_posted_date,Like_count,Reply_count,Video_id) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+    # Define a SQL INSERT statement
+    sqlite_Channel_insert_query = "INSERT INTO channel_details (Channel_id, Channel_name,Playlist_id,Subscribers,Views,Total_videos,Description,Country) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    sqlite_Video_insert_query = "INSERT INTO video_details (Video_id, Title,Thumbnail,Description,Published_date,Duration,Views,Likes,Comments,Favorite_count,Definition,Channel_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    sqlite_Comment_insert_query = "INSERT INTO comment_details (Comment_id, Comment_text,Comment_author,Comment_posted_date,Like_count,Reply_count,Video_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
 
-    # Loop through MongoDB data and update MySQL
+    # Loop through MongoDB data and update SQL
     for document in mongodb_data:
-        # Check if the data already exists in MySQL based on some criteria (e.g., Channel_id)
-        mysql_cursor.execute("SELECT COUNT(*) FROM channel_details WHERE Channel_id = %s", (document["Channel_details"][0]["Channel_id"],))
-        count = mysql_cursor.fetchone()[0]
+        # Check if the data already exists in SQL based on some criteria (e.g., Channel_id)
+        sqlite_cursor.execute("SELECT COUNT(*) FROM channel_details WHERE Channel_id = ?", (document["Channel_details"][0]["Channel_id"],))
+        count = sqlite_cursor.fetchone()[0]
 
         if count == 0:
             data_to_insert = (document["Channel_details"][0]["Channel_id"], document["Channel_details"][0]["Channel_name"],
                               document["Channel_details"][0]["Playlist_id"],document["Channel_details"][0]["Subscribers"],
                               document["Channel_details"][0]["Views"],document["Channel_details"][0]["Total_videos"],
                               document["Channel_details"][0]["Description"],document["Channel_details"][0]["Country"]) 
-            mysql_cursor.execute(mysql_Channel_insert_query, data_to_insert)
-            for video in document["Channel_details"][0]["video_details"]:
-                data_to_insert_video=(video["Video_id"],video["Title"],video["Thumbnail"],video["Description"],video["Published_date"],
-                                      video["Duration"],video["Views"],video["Likes"],video["Comments"],video["Favorite_count"],
-                                      video["Definition"],document["Channel_details"][0]["Channel_id"])
-                mysql_cursor.execute(mysql_Video_insert_query, data_to_insert_video)
-                if(len(video["Comment_details"])>0):
-                    for comment in video["Comment_details"]:
-                        data_to_insert_comment=(comment["Comment_id"],comment["Comment_text"],comment["Comment_author"],
-                                                comment["Comment_posted_date"],comment["Like_count"],comment["Reply_count"],video["Video_id"])
-                        mysql_cursor.execute(mysql_Comment_insert_query, data_to_insert_comment)
+            sqlite_cursor.execute(sqlite_Channel_insert_query, data_to_insert)
+            if(len(document["Channel_details"][0]["video_details"])>0):
+                for video in document["Channel_details"][0]["video_details"]:
+                    data_to_insert_video=(video["Video_id"],video["Title"],video["Thumbnail"],video["Description"],video["Published_date"],
+                                        video["Duration"],video["Views"],video["Likes"],video["Comments"],video["Favorite_count"],
+                                        video["Definition"],document["Channel_details"][0]["Channel_id"])
+                    sqlite_cursor.execute(sqlite_Video_insert_query, data_to_insert_video)
+                    if(len(video["Comment_details"])>0):
+                        for comment in video["Comment_details"]:
+                            data_to_insert_comment=(comment["Comment_id"],comment["Comment_text"],comment["Comment_author"],
+                                                    comment["Comment_posted_date"],comment["Like_count"],comment["Reply_count"],video["Video_id"])
+                            sqlite_cursor.execute(sqlite_Comment_insert_query, data_to_insert_comment)
             
-    # Commit the changes to MySQL and close the connection
-    mysql_connection.commit()
-    mysql_cursor.close()
-    mysql_connection.close()
+    # Commit the changes to SQL and close the connection
+    sqlite_con.commit()
+    sqlite_cursor.close()
+    sqlite_con.close()
 
 # HOME PAGE
 if selected == "Home":
     col1,col2 = st.columns(2,gap= 'medium')
     col1.markdown("## :blue[Domain] : Social Media")
-    col1.markdown("## :blue[Technologies used] : Python,MongoDB, Youtube Data API, MySql, Streamlit")
+    col1.markdown("## :blue[Technologies used] : Python,MongoDB, Youtube Data API, SQLite, Streamlit")
     col1.markdown("## :blue[Overview] : Retrieving the Youtube channels data from the Google API, storing it in a MongoDB as data lake, migrating and transforming data into a SQL database,then querying the data and displaying it in the Streamlit app.")
     col2.markdown("#   ")
     col2.markdown("#   ")
@@ -222,7 +257,7 @@ if selected == "Extract":
             ch_details = main_function(ch_id)
             collections = db.channel_detail
             collections.insert_one(ch_details)
-            st.success("Upload to MogoDB successful !!")
+            st.success("Upload to MongoDB successful !!")
 
 # TRANSFORM PAGE
 if selected =="Transform":    
@@ -234,8 +269,8 @@ if selected =="Transform":
     
     if st.button("Submit"):
         try:
-            MongoDBtoMySQL(user_inp)
-            st.success("Transformation to MySQL Successful !!")
+            MongoDBtoSQLite(user_inp)
+            st.success("Transformation to SQL Successful !!")
         except:
             st.error("Channel details already transformed !!")
        
@@ -256,72 +291,85 @@ if selected == "View":
     '10. Which videos have the highest number of comments, and what are their corresponding channel names?'])
 
     if questions == '1. What are the names of all the videos and their corresponding channels?':
-        mysql_cursor.execute("""select vd.Title,cd.Channel_name from video_details vd 
+        sqlite_cursor.execute("""select vd.Title,cd.Channel_name from video_details vd 
                              join channel_details cd on vd.Channel_id=cd.Channel_id""")
-        df = pd.DataFrame(mysql_cursor.fetchall(),columns=mysql_cursor.column_names)
+        # Get the column names from cursor description
+        columns = [column[0] for column in sqlite_cursor.description]
+
+        # Create a DataFrame using the fetched data and column names
+        df = pd.DataFrame(sqlite_cursor.fetchall(), columns=columns)
         df.index=df.index+1
         st.write(df)
     elif questions == '2. Which channels have the most number of videos, and how many videos do they have?':
-        mysql_cursor.execute("""select cd.Channel_name, count(vd.Video_id) as VideoCount from channel_details cd 
+        sqlite_cursor.execute("""select cd.Channel_name, count(vd.Video_id) as VideoCount from channel_details cd 
                                 join video_details vd on cd.Channel_id=vd.Channel_id
                                 group by cd.Channel_name order by VideoCount desc limit 1;""")
-        df = pd.DataFrame(mysql_cursor.fetchall(),columns=mysql_cursor.column_names)
+        columns = [column[0] for column in sqlite_cursor.description]
+        df = pd.DataFrame(sqlite_cursor.fetchall(), columns=columns)
         df.index=df.index+1
         st.write(df)
     elif questions == '3. What are the top 10 most viewed videos and their respective channels?':
-        mysql_cursor.execute("""select vd.Title, cd.Channel_name, vd.Views from video_details vd
+        sqlite_cursor.execute("""select vd.Title, cd.Channel_name, vd.Views from video_details vd
                                 join channel_details cd on vd.Channel_id=cd.Channel_id
                                 order by vd.Views desc limit 10;""")
-        df = pd.DataFrame(mysql_cursor.fetchall(),columns=mysql_cursor.column_names)
+        columns = [column[0] for column in sqlite_cursor.description]
+        df = pd.DataFrame(sqlite_cursor.fetchall(), columns=columns)
         df.index=df.index+1
         st.write(df)
     elif questions == '4. How many comments were made on each video, and what are their corresponding video names?':
-        mysql_cursor.execute("""select vd.Title, count(*) as CommentCount from comment_details cm 
+        sqlite_cursor.execute("""select vd.Title, count(*) as CommentCount from comment_details cm 
                                 join video_details vd on cm.Video_id=vd.Video_id
                                 group by vd.Title;""")
-        df = pd.DataFrame(mysql_cursor.fetchall(),columns=mysql_cursor.column_names)
+        columns = [column[0] for column in sqlite_cursor.description]
+        df = pd.DataFrame(sqlite_cursor.fetchall(), columns=columns)
         df.index=df.index+1
         st.write(df)
     elif questions == '5. Which videos have the highest number of likes, and what are their corresponding channel names?':
-        mysql_cursor.execute("""select vd.Title, cd.Channel_name, vd.Likes from video_details vd 
+        sqlite_cursor.execute("""select vd.Title, cd.Channel_name, vd.Likes from video_details vd 
                                 join channel_details cd on vd.Channel_id=cd.Channel_id 
                                 order by vd.Likes desc limit 1;""")
-        df = pd.DataFrame(mysql_cursor.fetchall(),columns=mysql_cursor.column_names)
+        columns = [column[0] for column in sqlite_cursor.description]
+        df = pd.DataFrame(sqlite_cursor.fetchall(), columns=columns)
         df.index=df.index+1
         st.write(df)
     elif questions == '6. What is the total number of likes for each video, and what are their corresponding video names?':
-        mysql_cursor.execute("""select vd.Title, sum(vd.Likes) as TotalLikes from video_details vd 
+        sqlite_cursor.execute("""select vd.Title, sum(vd.Likes) as TotalLikes from video_details vd 
                                 group by vd.Title;""")
-        df = pd.DataFrame(mysql_cursor.fetchall(),columns=mysql_cursor.column_names)
+        columns = [column[0] for column in sqlite_cursor.description]
+        df = pd.DataFrame(sqlite_cursor.fetchall(), columns=columns)
         df.index=df.index+1
         st.write(df)
     elif questions == '7. What is the total number of views for each channel, and what are their corresponding channel names?':
-        mysql_cursor.execute("""select cd.Channel_name, sum(vd.Views) as TotalViews from channel_details cd
+        sqlite_cursor.execute("""select cd.Channel_name, sum(vd.Views) as TotalViews from channel_details cd
                                 join video_details vd on cd.Channel_id=vd.Channel_id
                                 group by cd.Channel_name;""")
-        df = pd.DataFrame(mysql_cursor.fetchall(),columns=mysql_cursor.column_names)
+        columns = [column[0] for column in sqlite_cursor.description]
+        df = pd.DataFrame(sqlite_cursor.fetchall(), columns=columns)
         df.index=df.index+1
         st.write(df)
     elif questions == '8. What are the names of all the channels that have published videos in the year 2022?':
-        mysql_cursor.execute("""select distinct cd.Channel_name
+        sqlite_cursor.execute("""select distinct cd.Channel_name
                                 from channel_details cd join video_details vd on  cd.Channel_id = vd.Channel_id
                                 where year(str_to_date(vd.Published_date, '%Y-%m-%dT%H:%i:%sZ')) = 2022;""")
-        df = pd.DataFrame(mysql_cursor.fetchall(),columns=mysql_cursor.column_names)
+        columns = [column[0] for column in sqlite_cursor.description]
+        df = pd.DataFrame(sqlite_cursor.fetchall(), columns=columns)
         df.index=df.index+1
         st.write(df)
     elif questions == '9. What is the average duration of all videos in each channel, and what are their corresponding channel names?':
-        mysql_cursor.execute("""select cd.Channel_name,avg(substring_index(substring_index(vd.Duration, 'T', -1), 'M', 1) * 60 +
+        sqlite_cursor.execute("""select cd.Channel_name,avg(substring_index(substring_index(vd.Duration, 'T', -1), 'M', 1) * 60 +
                                 substring_index(substring_index(vd.Duration, 'M', -1), 'S', 1)) as average_duration_seconds from 
                                 channel_details cd join video_details vd on cd.Channel_id = vd.Channel_id group by cd.Channel_name;""")
-        df = pd.DataFrame(mysql_cursor.fetchall(),columns=mysql_cursor.column_names)
+        columns = [column[0] for column in sqlite_cursor.description]
+        df = pd.DataFrame(sqlite_cursor.fetchall(), columns=columns)
         df.index=df.index+1
         st.write(df)
     elif questions == '10. Which videos have the highest number of comments, and what are their corresponding channel names?':
-        mysql_cursor.execute("""select vd.Title as Video_Title, cd.Channel_name as Channel_Name, cd.Channel_id as Channel_ID,
+        sqlite_cursor.execute("""select vd.Title as Video_Title, cd.Channel_name as Channel_Name, cd.Channel_id as Channel_ID,
                                 vd.Comments as Number_of_Comments from video_details vd
                                 join channel_details cd on vd.Channel_id = cd.Channel_id
                                 where vd.Comments = (select max(Comments) from video_details);""")
-        df = pd.DataFrame(mysql_cursor.fetchall(),columns=mysql_cursor.column_names)
+        columns = [column[0] for column in sqlite_cursor.description]
+        df = pd.DataFrame(sqlite_cursor.fetchall(), columns=columns)
         df.index=df.index+1
         st.write(df)
         
