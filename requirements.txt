@@ -3,5 +3,5 @@ streamlit_option_menu
 pillow
 pymongo
 pandas
-mysql-connector-python
+db-sqlite3
 google-api-python-client
